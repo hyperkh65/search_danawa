@@ -25,67 +25,69 @@ def crawl_product_info(search_query):
     product_list = []
     soup = get_page_content(search_query, 1)
     max_pages = get_total_pages(soup)
-    
+
     if max_pages == 0:
         st.warning("페이지를 찾을 수 없습니다.")
         return product_list
 
-    with st.progress(0) as progress_bar:
-        for page_num in range(1, max_pages + 1):
-            soup = get_page_content(search_query, page_num)
-            products = soup.select('li.prod_item')
+    # 진행률 막대 초기화
+    progress_bar = st.progress(0)
 
-            for product in products:
-                try:
-                    # 제품명 가져오기
-                    name_tag = product.select_one('p.prod_name a')
-                    name = name_tag.text.strip() if name_tag else '정보 없음'
+    for page_num in range(1, max_pages + 1):
+        soup = get_page_content(search_query, page_num)
+        products = soup.select('li.prod_item')
 
-                    # 가격 가져오기
-                    price_tag = product.select_one('p.price_sect a strong')
-                    price = price_tag.text.strip() if price_tag else '정보 없음'
+        for product in products:
+            try:
+                # 제품명 가져오기
+                name_tag = product.select_one('p.prod_name a')
+                name = name_tag.text.strip() if name_tag else '정보 없음'
 
-                    # 이미지 URL 가져오기
-                    image_tag = product.select_one('div.thumb_image a img')
-                    image_url = image_tag['src'] if image_tag else '정보 없음'
+                # 가격 가져오기
+                price_tag = product.select_one('p.price_sect a strong')
+                price = price_tag.text.strip() if price_tag else '정보 없음'
 
-                    # 링크 가져오기
-                    link_tag = product.select_one('div.thumb_image a')
-                    link = link_tag['href'] if link_tag else '정보 없음'
+                # 이미지 URL 가져오기
+                image_tag = product.select_one('div.thumb_image a img')
+                image_url = image_tag['src'] if image_tag else '정보 없음'
 
-                    # 추가 정보 가져오기
-                    spec_tag = product.select_one('div.spec_list')
-                    additional_info = spec_tag.text.strip() if spec_tag else '정보 없음'
+                # 링크 가져오기
+                link_tag = product.select_one('div.thumb_image a')
+                link = link_tag['href'] if link_tag else '정보 없음'
 
-                    # 등록월 가져오기
-                    date_tag = product.select_one('div.prod_sub_meta dl.meta_item.mt_date dd')
-                    date = date_tag.text.strip() if date_tag else '정보 없음'
+                # 추가 정보 가져오기
+                spec_tag = product.select_one('div.spec_list')
+                additional_info = spec_tag.text.strip() if spec_tag else '정보 없음'
 
-                    # 평점 가져오기
-                    rating_tag = product.select_one('div.star-single span.text__score')
-                    rating = rating_tag.text.strip() if rating_tag else '정보 없음'
+                # 등록월 가져오기
+                date_tag = product.select_one('div.prod_sub_meta dl.meta_item.mt_date dd')
+                date = date_tag.text.strip() if date_tag else '정보 없음'
 
-                    # 리뷰 수 가져오기
-                    review_count_tag = product.select_one('div.text__review span.text__number')
-                    review_count = review_count_tag.text.strip() if review_count_tag else '정보 없음'
+                # 평점 가져오기
+                rating_tag = product.select_one('div.star-single span.text__score')
+                rating = rating_tag.text.strip() if rating_tag else '정보 없음'
 
-                    # 데이터 저장
-                    product_list.append({
-                        '제품명': name,
-                        '가격': price,
-                        '이미지 URL': image_url,
-                        '링크': link,
-                        '추가 정보': additional_info,
-                        '등록월': date,
-                        '평점': rating,
-                        '리뷰 수': review_count
-                    })
+                # 리뷰 수 가져오기
+                review_count_tag = product.select_one('div.text__review span.text__number')
+                review_count = review_count_tag.text.strip() if review_count_tag else '정보 없음'
 
-                except Exception as e:
-                    print(f"Error processing product: {e}")
+                # 데이터 저장
+                product_list.append({
+                    '제품명': name,
+                    '가격': price,
+                    '이미지 URL': image_url,
+                    '링크': link,
+                    '추가 정보': additional_info,
+                    '등록월': date,
+                    '평점': rating,
+                    '리뷰 수': review_count
+                })
 
-            # 진행률 업데이트
-            progress_bar.progress((page_num / max_pages) if max_pages > 0 else 0)
+            except Exception as e:
+                print(f"Error processing product: {e}")
+
+        # 진행률 업데이트
+        progress_bar.progress(page_num / max_pages)
 
     return product_list
 
