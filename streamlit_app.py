@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # 이 줄에서 모듈이 필요합니다.
 
 def download_chromedriver():
     url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
