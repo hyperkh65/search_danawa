@@ -1,30 +1,15 @@
 import os
-import subprocess
-import requests
-import zipfile
-import platform
+import urllib.request
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
-from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
-import urllib.request
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 import streamlit as st
-
-def get_installed_chrome_version():
-    """Streamlit Cloud 서버에 설치된 Chrome 버전을 확인합니다."""
-    try:
-        version_output = subprocess.check_output(['google-chrome', '--version'])
-        chrome_version = version_output.decode('utf-8').strip().split()[-1]
-        return chrome_version
-    except Exception as e:
-        st.error(f"Chrome 버전 확인 중 오류 발생: {e}")
-        return None
 
 def go_to_page(driver, search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&originalQuery={search_query}&previousKeyword={search_query}&checkedInfo=N&volumeType=allvs&page={page_num}&limit=40&sort=saveDESC&list=list&boost=true&tab=goods&addDelivery=N&coupangMemberSort=N&isInitTireSmartFinder=N&recommendedSort=N&defaultUICategoryCode=15242844&defaultPhysicsCategoryCode=1826%7C58563%7C58565%7C0&defaultVmTab=331&defaultVaTab=45807&isZeroPrice=Y&quickProductYN=N&priceUnitSort=N&priceUnitSortOrder=A"
@@ -43,14 +28,6 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
-    # 서버의 Chrome 버전 확인
-    chrome_version = get_installed_chrome_version()
-    if chrome_version is None:
-        st.error("Chrome 버전을 확인할 수 없습니다.")
-        return
-    
-    st.write(f"서버에 설치된 Chrome 버전: {chrome_version}")
-
     # webdriver_manager를 사용해 ChromeDriver 관리
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('--headless')  # Headless 모드
@@ -130,7 +107,7 @@ def main(search_query, start_page, end_page):
     wb.save(filename)
     st.success(f"{filename} 파일이 생성되었습니다.")
 
-    # Google Colab에서 다운로드 링크를 생성하는 부분을 Streamlit으로 대체
+    # Streamlit에서 다운로드 버튼을 추가
     with open(filename, "rb") as f:
         st.download_button("다운로드", f, filename=filename)
 
