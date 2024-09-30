@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import re
 import time
 
 # 페이지 컨텐츠를 받아오는 함수
@@ -44,8 +43,8 @@ def crawl_product_info(search_query):
                 # 이미지 URL 가져오기
                 image_tag = product.select_one('div.thumb_image a img')
                 image_url = image_tag['src'] if image_tag else '정보 없음'
-                
-                # URL 수정: http 또는 https로 시작하도록 설정
+
+                # 이미지 URL이 "//"로 시작하면 "https:"를 붙여서 절대 경로로 만듦
                 if image_url.startswith("//"):
                     image_url = "https:" + image_url
 
@@ -107,7 +106,8 @@ if search_button:
     # 각 제품의 이미지를 크게 표시
     st.subheader("제품 이미지")
     for product in product_list:
-        st.image(product['이미지'], caption=product['제품명'], use_column_width='auto')  # 이미지 크기 자동 조정
+        if product['이미지'] != '정보 없음':  # 이미지가 존재하는 경우에만 표시
+            st.image(product['이미지'], caption=product['제품명'], use_column_width='auto')  # 이미지 크기 자동 조정
 
     # CSV 파일 다운로드 버튼
     csv = df.to_csv(index=False, encoding='utf-8-sig')
