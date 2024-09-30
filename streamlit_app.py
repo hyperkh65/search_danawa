@@ -10,7 +10,6 @@ from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.styles import Font, Alignment
-from bs4 import BeautifulSoup
 import streamlit as st
 
 def download_chromedriver():
@@ -50,7 +49,8 @@ def main(search_query, start_page, end_page):
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument("user-agent=Your User Agent")
 
-    driver = webdriver.Chrome(service=ChromeService("chromedriver"), options=chrome_options)
+    # ChromeDriver 경로를 명시적으로 지정
+    driver = webdriver.Chrome(executable_path="./chromedriver", service=ChromeService(), options=chrome_options)
 
     wb = Workbook()
     ws = wb.active
