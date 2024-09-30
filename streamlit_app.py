@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import re
+import time
 
 # 페이지 컨텐츠를 받아오는 함수
 def get_page_content(search_query, page_num):
@@ -12,30 +14,28 @@ def get_page_content(search_query, page_num):
     response = requests.get(url, headers=headers)
     return BeautifulSoup(response.content, 'html.parser')
 
-# 최대 페이지 수를 찾는 함수
-def get_max_pages(search_query):
-    soup = get_page_content(search_query, 1)
-    pagination = soup.select_one('div.paging_number_wrap')
-    if pagination:
-        return len(pagination.select('a.click_log_page'))
-    return 0
-
 # 제품 정보 크롤링 함수
 def crawl_product_info(search_query):
     product_list = []
-    max_pages = get_max_pages(search_query)  # 최대 페이지 수 가져오기
+    
+    # 최대 페이지 수 자동으로 추출
+    soup = get_page_content(search_query, 1)
+    max_pages = len(soup.select('div.paging_number_wrap a'))  # 최대 페이지 수 추출
 
     for page_num in range(1, max_pages + 1):
+        st.progress(page_num / max_pages)  # 진행률 표시
         soup = get_page_content(search_query, page_num)
         products = soup.select('li.prod_item')
 
         for product in products:
             try:
-                # 제품명과 업체명 가져오기
+                # 제품명 가져오기
                 name_tag = product.select_one('p.prod_name a')
                 name = name_tag.text.strip() if name_tag else '정보 없음'
-                company_name = name.split()[0] if name else '정보 없음'
-                product_name = ' '.join(name.split()[1:]) if name else '정보 없음'
+                
+                # 업체명 추출
+                업체명 = name.split(' ')[0]  # 첫 번째 공백 전까지 잘라서 업체명으로 사용
+                제품명 = ' '.join(name.split(' ')[1:])  # 첫 번째 공백 이후 제품명
 
                 # 가격 가져오기
                 price_tag = product.select_one('p.price_sect a strong')
@@ -43,35 +43,36 @@ def crawl_product_info(search_query):
 
                 # 이미지 URL 가져오기
                 image_tag = product.select_one('div.thumb_image a img')
-                image_url = image_tag['src'] if image_tag else ''
+                image_url = image_tag['src'] if image_tag else '정보 없음'
 
                 # 링크 가져오기
-                link = product.select_one('div.thumb_image a')['href'] if product.select_one('div.thumb_image a') else '정보 없음'
+                link_tag = product.select_one('div.thumb_image a')
+                link = link_tag['href'] if link_tag else '정보 없음'
 
-                # 추가 정보, 등록 월, 평점, 리뷰 수 가져오기
+                # 추가 정보, 등록월, 평점, 리뷰 수 가져오기
                 additional_info_tag = product.select_one('div.spec_list')
                 additional_info = additional_info_tag.text.strip() if additional_info_tag else '정보 없음'
 
-                registration_month_tag = product.select_one('div.prod_sub_meta dl.meta_item.mt_date dd')
-                registration_month = registration_month_tag.text.strip() if registration_month_tag else '정보 없음'
+                registration_date_tag = product.select_one('div.prod_sub_meta > dl.meta_item.mt_date > dd')
+                registration_date = registration_date_tag.text.strip() if registration_date_tag else '정보 없음'
 
-                rating_tag = product.select_one('div.star-single span.text__score')
+                rating_tag = product.select_one('div.star-single > span.text__score')
                 rating = rating_tag.text.strip() if rating_tag else '정보 없음'
 
-                review_count_tag = product.select_one('div.text__review span.text__number')
+                review_count_tag = product.select_one('div.text__review > span.text__number')
                 review_count = review_count_tag.text.strip() if review_count_tag else '정보 없음'
 
                 # 데이터 저장
                 product_list.append({
-                    '업체명': company_name,
-                    '제품명': product_name,
+                    '업체명': 업체명,
+                    '제품명': 제품명,
                     '추가정보': additional_info,
                     '가격': price,
                     '이미지': image_url,
                     '링크': link,
                     '평점': rating,
-                    '리뷰': review_count,
-                    '등록월': registration_month
+                    '리뷰 수': review_count,
+                    '등록월': registration_date
                 })
 
             except Exception as e:
@@ -97,12 +98,12 @@ if search_button:
     
     # 결과를 데이터프레임으로 변환 후 출력
     df = pd.DataFrame(product_list)
+    st.dataframe(df)
 
-    # 이미지 URL을 이미지로 변환
-    df['이미지'] = df['이미지'].apply(lambda x: f'<img src="{x}" width="100" />' if x else '정보 없음')
-
-    # Streamlit에서 HTML로 이미지 표시
-    st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+    # 각 제품의 이미지를 크게 표시
+    st.subheader("제품 이미지")
+    for product in product_list:
+        st.image(product['이미지'], caption=product['제품명'], use_column_width=True)
 
     # CSV 파일 다운로드 버튼
     csv = df.to_csv(index=False, encoding='utf-8-sig')
