@@ -8,37 +8,30 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from PIL import Image
 from openpyxl import Workbook
-from openpyxl.drawing.image import Image as ExcelImage
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, Alignment
 import streamlit as st
 
-# ChromeDriver 다운로드 함수
+# ChromeDriver 다운로드 및 설정
 def download_chromedriver():
     url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
     response = requests.get(url)
-    
+
     with open("chromedriver.zip", "wb") as file:
         file.write(response.content)
 
     os.system("unzip chromedriver.zip")
     os.system("chmod +x chromedriver")  # 실행 권한 부여
 
-# 페이지로 이동하는 함수
 def go_to_page(driver, search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
     driver.get(url)
 
-# 기본 이미지 생성 함수
 def create_default_image(image_path):
     default_image = Image.new('RGB', (100, 100), color='white')
     default_image.save(image_path)
 
-# 파일 이름 정리 함수
 def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
-# 메인 함수
 def main(search_query, start_page, end_page):
     # ChromeDriver가 존재하지 않으면 다운로드
     if not os.path.exists("chromedriver"):
