@@ -9,22 +9,9 @@ from selenium.webdriver.common.by import By
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
+from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
-import streamlit as st
-
-def download_chromedriver():
-    url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
-    response = requests.get(url)
-
-    with open("chromedriver.zip", "wb") as file:
-        file.write(response.content)
-
-    os.system("unzip chromedriver.zip")
-    os.system("chmod +x chromedriver")  # 실행 권한 부여
-
-def go_to_page(driver, search_query, page_num):
-    url = f"https://search.danawa.com/dsearch.php?query={search_query}&originalQuery={search_query}&previousKeyword={search_query}&checkedInfo=N&volumeType=allvs&page={page_num}&limit=40&sort=saveDESC&list=list&boost=true&tab=goods&addDelivery=N&coupangMemberSort=N&isInitTireSmartFinder=N&recommendedSort=N&defaultUICategoryCode=15242844&defaultPhysicsCategoryCode=1826%7C58563%7C58565%7C0&defaultVmTab=331&defaultVaTab=45807&isZeroPrice=Y&quickProductYN=N&priceUnitSort=N&priceUnitSortOrder=A"
-    driver.get(url)
+from bs4 import BeautifulSoup
 
 def resize_image(image_path, width, height):
     img = Image.open(image_path)
@@ -38,22 +25,18 @@ def create_default_image(image_path):
 def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
-def main(search_query, start_page, end_page):
-    if not os.path.exists("chromedriver"):
-        download_chromedriver()
+def go_to_page(driver, search_query, page_num):
+    url = f"https://search.danawa.com/dsearch.php?query={search_query}&originalQuery={search_query}&previousKeyword={search_query}&checkedInfo=N&volumeType=allvs&page={page_num}&limit=40&sort=saveDESC&list=list&boost=true&tab=goods&addDelivery=N&coupangMemberSort=N&isInitTireSmartFinder=N&recommendedSort=N&defaultUICategoryCode=15242844&defaultPhysicsCategoryCode=1826%7C58563%7C58565%7C0&defaultVmTab=331&defaultVaTab=45807&isZeroPrice=Y&quickProductYN=N&priceUnitSort=N&priceUnitSortOrder=A"
+    driver.get(url)
 
+def main(search_query, start_page, end_page):
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.add_argument("user-agent=Your User Agent")
-
-    # ChromeService 생성 시 ChromeDriver의 경로를 설정
-    service = ChromeService(executable_path="./chromedriver")
 
     # 드라이버 초기화
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver = webdriver.Chrome(service=ChromeService("./chromedriver"), options=chrome_options)
 
     wb = Workbook()
     ws = wb.active
@@ -82,8 +65,7 @@ def main(search_query, start_page, end_page):
                                                 'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_star > div.point_num > strong').text
                 review_count = container.find_element(By.CSS_SELECTOR,
                                                       'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_opinion > a > strong').text
-            except Exception as e:
-                print(f"Error extracting product info: {e}")
+            except:
                 product_price = "가격 정보 없음"
                 registration_month = "등록월 정보 없음"
                 rating = "평점 정보 없음"
@@ -126,16 +108,17 @@ def main(search_query, start_page, end_page):
 
     wb.save(filename)
     
-    st.success(f"크롤링 완료! 결과 파일: {filename}")
+    st.success(f"크롤링이 완료되었습니다! 파일명: {filename}")
 
-# Streamlit UI 설정
-st.title("제품 크롤러")
-search_query = st.text_input("검색어를 입력하세요:")
-start_page = st.number_input("시작 페이지:", min_value=1, value=1)
-end_page = st.number_input("종료 페이지:", min_value=1, value=1)
+if __name__ == '__main__':
+    st.title("Streamlit과 Selenium 웹 크롤링")
+    
+    search_query = st.text_input("검색어를 입력하세요:")
+    start_page = st.number_input("시작 페이지를 입력하세요:", min_value=1, value=1)
+    end_page = st.number_input("종료 페이지를 입력하세요:", min_value=1, value=1)
 
-if st.button("크롤링 시작"):
-    if search_query:
-        main(search_query, start_page, end_page)
-    else:
-        st.warning("검색어를 입력해 주세요.")
+    if st.button("데이터 크롤링 시작"):
+        if search_query:
+            main(search_query, start_page, end_page)
+        else:
+            st.error("검색어를 입력하세요.")
