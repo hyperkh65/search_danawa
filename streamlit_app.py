@@ -5,10 +5,9 @@ import re
 import time
 from datetime import datetime
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 import streamlit as st
@@ -18,13 +17,11 @@ from PIL import Image
 def get_website_content(url):
     driver = None
     try:
-        # ChromeDriver 설정
         options = Options()
         options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1200')
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        st.write(f"DEBUG:DRIVER:{driver}")
         driver.get(url)
         time.sleep(5)
         html_doc = driver.page_source
@@ -102,15 +99,15 @@ def main(search_query, start_page, end_page):
 
     driver.quit()  # 드라이버 종료
 
-if __name__ == '__main__':
-    st.title("Streamlit과 Selenium 웹 크롤링")
-    search_query = st.text_input("검색어를 입력하세요:")
-    start_page = st.number_input("시작 페이지를 입력하세요:", min_value=1, value=1)
-    end_page = st.number_input("종료 페이지를 입력하세요:", min_value=1, value=2)
+# Streamlit UI 설정
+st.title("Streamlit과 Selenium 웹 크롤링")
+search_query = st.text_input("검색어를 입력하세요:")
+start_page = st.number_input("시작 페이지를 입력하세요:", min_value=1, value=1)
+end_page = st.number_input("종료 페이지를 입력하세요:", min_value=1, value=2)
 
-    if st.button("데이터 크롤링 시작"):
-        if search_query:
-            main(search_query, start_page, end_page)
-            st.success("크롤링이 완료되었습니다.")
-        else:
-            st.error("검색어를 입력하세요.")
+if st.button("데이터 크롤링 시작"):
+    if search_query:
+        main(search_query, start_page, end_page)
+        st.success("크롤링이 완료되었습니다.")
+    else:
+        st.error("검색어를 입력하세요.")
