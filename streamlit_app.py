@@ -43,14 +43,17 @@ def main(search_query, start_page, end_page):
         download_chromedriver()
 
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument("user-agent=Your User Agent")
 
-    # ChromeDriver 경로를 명시적으로 지정
-    driver = webdriver.Chrome(executable_path="./chromedriver", service=ChromeService(), options=chrome_options)
+    # ChromeService 생성 시 ChromeDriver의 경로를 설정
+    service = ChromeService(executable_path="./chromedriver")
+
+    # 드라이버 초기화
+    driver = webdriver.Chrome(service=service, options=chrome_options)
 
     wb = Workbook()
     ws = wb.active
@@ -79,7 +82,8 @@ def main(search_query, start_page, end_page):
                                                 'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_star > div.point_num > strong').text
                 review_count = container.find_element(By.CSS_SELECTOR,
                                                       'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_opinion > a > strong').text
-            except:
+            except Exception as e:
+                print(f"Error extracting product info: {e}")
                 product_price = "가격 정보 없음"
                 registration_month = "등록월 정보 없음"
                 rating = "평점 정보 없음"
