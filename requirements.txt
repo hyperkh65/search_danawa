@@ -1,8 +1,5 @@
 streamlit
-pandas
-requests
+selenium-wire
+chromedriver_autoinstaller
 beautifulsoup4
-openpyxl
-Pillow
-selenium
-webdriver-manager
+pandas
