@@ -1,0 +1,5 @@
+streamlit
+selenium
+Pillow
+openpyxl
+beautifulsoup4
