@@ -10,17 +10,6 @@ from PIL import Image
 from openpyxl import Workbook
 import streamlit as st
 
-# ChromeDriver 다운로드 및 설정
-def download_chromedriver():
-    url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
-    response = requests.get(url)
-
-    with open("chromedriver.zip", "wb") as file:
-        file.write(response.content)
-
-    os.system("unzip chromedriver.zip")
-    os.system("chmod +x chromedriver")  # 실행 권한 부여
-
 def go_to_page(driver, search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
     driver.get(url)
@@ -33,17 +22,13 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
-    # ChromeDriver가 존재하지 않으면 다운로드
-    if not os.path.exists("chromedriver"):
-        download_chromedriver()
-
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
 
-    # 드라이버 초기화
-    service = ChromeService(executable_path="./chromedriver")  # 경로 확인
+    # 기본 ChromeDriver 사용
+    service = ChromeService()  # 여기서 executable_path 생략
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     wb = Workbook()
@@ -68,7 +53,6 @@ def main(search_query, start_page, end_page):
                 price = container.find_element(By.CSS_SELECTOR, 'p.price').text
                 link = container.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
 
-                # 이미지 URL 수집
                 image_url = container.find_element(By.CSS_SELECTOR, 'img').get_attribute('src')
                 if not image_url:
                     image_path = default_image_path
@@ -77,9 +61,8 @@ def main(search_query, start_page, end_page):
                     image_path = os.path.join(image_directory, image_name)
                     urllib.request.urlretrieve(image_url, image_path)
 
-                # 부가 정보 및 리뷰 수
                 additional_info = container.find_element(By.CSS_SELECTOR, 'p.info').text
-                registration_date = datetime.today().strftime('%Y-%m-%d')  # 현재 날짜로 설정
+                registration_date = datetime.today().strftime('%Y-%m-%d')
                 rating = container.find_element(By.CSS_SELECTOR, 'span.rating').text if container.find_elements(By.CSS_SELECTOR, 'span.rating') else "N/A"
                 review_count = container.find_element(By.CSS_SELECTOR, 'span.review_count').text if container.find_elements(By.CSS_SELECTOR, 'span.review_count') else "0"
 
