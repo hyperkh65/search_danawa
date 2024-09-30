@@ -1,19 +1,33 @@
-import streamlit as st
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+import os
+import subprocess
+import requests
+import zipfile
+import platform
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
 import urllib.request
-import os
-import re
 from datetime import datetime
-import io
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+import streamlit as st
+
+def get_installed_chrome_version():
+    """Streamlit Cloud 서버에 설치된 Chrome 버전을 확인합니다."""
+    try:
+        version_output = subprocess.check_output(['google-chrome', '--version'])
+        chrome_version = version_output.decode('utf-8').strip().split()[-1]
+        return chrome_version
+    except Exception as e:
+        st.error(f"Chrome 버전 확인 중 오류 발생: {e}")
+        return None
 
 def go_to_page(driver, search_query, page_num):
-    url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
+    url = f"https://search.danawa.com/dsearch.php?query={search_query}&originalQuery={search_query}&previousKeyword={search_query}&checkedInfo=N&volumeType=allvs&page={page_num}&limit=40&sort=saveDESC&list=list&boost=true&tab=goods&addDelivery=N&coupangMemberSort=N&isInitTireSmartFinder=N&recommendedSort=N&defaultUICategoryCode=15242844&defaultPhysicsCategoryCode=1826%7C58563%7C58565%7C0&defaultVmTab=331&defaultVaTab=45807&isZeroPrice=Y&quickProductYN=N&priceUnitSort=N&priceUnitSortOrder=A"
     driver.get(url)
 
 def resize_image(image_path, width, height):
@@ -29,11 +43,21 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
+    # 서버의 Chrome 버전 확인
+    chrome_version = get_installed_chrome_version()
+    if chrome_version is None:
+        st.error("Chrome 버전을 확인할 수 없습니다.")
+        return
+    
+    st.write(f"서버에 설치된 Chrome 버전: {chrome_version}")
+
+    # webdriver_manager를 사용해 ChromeDriver 관리
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
+    chrome_options.add_argument('--headless')  # Headless 모드
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    driver = webdriver.Chrome(options=chrome_options)
+
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
 
     wb = Workbook()
     ws = wb.active
@@ -48,15 +72,20 @@ def main(search_query, start_page, end_page):
 
     for page_num in range(start_page, end_page + 1):
         go_to_page(driver, search_query, page_num)
+
         product_containers = driver.find_elements(By.CSS_SELECTOR, 'div.prod_main_info')
 
         for container in product_containers:
             try:
                 product_title = container.find_element(By.CSS_SELECTOR, 'div.prod_info > p > a').text
-                product_price = container.find_element(By.CSS_SELECTOR, 'div.prod_pricelist > ul > li > p.price_sect > a > strong').text
-                registration_month = container.find_element(By.CSS_SELECTOR, 'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_date > dd').text
-                rating = container.find_element(By.CSS_SELECTOR, 'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_star > div.point_num > strong').text
-                review_count = container.find_element(By.CSS_SELECTOR, 'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_opinion > a > strong').text
+                product_price = container.find_element(By.CSS_SELECTOR,
+                                                       'div.prod_pricelist > ul > li > p.price_sect > a > strong').text
+                registration_month = container.find_element(By.CSS_SELECTOR,
+                                                            'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_date > dd').text
+                rating = container.find_element(By.CSS_SELECTOR,
+                                                'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_star > div.point_num > strong').text
+                review_count = container.find_element(By.CSS_SELECTOR,
+                                                      'div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_opinion > a > strong').text
             except:
                 product_price = "가격 정보 없음"
                 registration_month = "등록월 정보 없음"
@@ -93,28 +122,26 @@ def main(search_query, start_page, end_page):
             link_cell.font = Font(color='0563C1', underline='single')
             link_cell.alignment = Alignment(horizontal='center')
             ws[f'E{ws.max_row}'].hyperlink = product_link
+            ws[f'E{ws.max_row}'].style = 'Hyperlink'
 
     today_date = datetime.today().strftime('%Y-%m-%d')
     filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
-    
-    # Excel 파일을 메모리에 저장
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
 
-    driver.quit()
-    return filename, output
+    wb.save(filename)
+    st.success(f"{filename} 파일이 생성되었습니다.")
 
-# Streamlit 앱 시작
-st.title("온라인 시장 조사")
-search_query = st.text_input("검색어를 입력하세요:")
-start_page = st.number_input("시작 페이지를 입력하세요:", min_value=1, value=1)
-end_page = st.number_input("종료 페이지를 입력하세요:", min_value=1, value=1)
+    # Google Colab에서 다운로드 링크를 생성하는 부분을 Streamlit으로 대체
+    with open(filename, "rb") as f:
+        st.download_button("다운로드", f, filename=filename)
 
-if st.button("검색 시작"):
-    if search_query and start_page <= end_page:
-        filename, output = main(search_query, start_page, end_page)
-        st.success(f"{filename} 파일이 생성되었습니다.")
-        st.download_button("파일 다운로드", output, filename=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    else:
-        st.error("유효한 검색어와 페이지 범위를 입력하세요.")
+if __name__ == '__main__':
+    st.title("온라인 시장 조사")
+    search_query = st.text_input("검색어를 입력하세요:")
+    start_page = st.number_input("시작 페이지를 입력하세요:", min_value=1, value=1)
+    end_page = st.number_input("종료 페이지를 입력하세요:", min_value=1, value=1)
+
+    if st.button("검색"):
+        if search_query:
+            main(search_query, start_page, end_page)
+        else:
+            st.warning("검색어를 입력해주세요.")
