@@ -37,7 +37,12 @@ def main(search_query, start_page, end_page):
     chrome_options.add_argument('--disable-gpu')  # GPU 사용 비활성화
     chrome_options.add_argument('--window-size=1920,1080')  # 가상 화면 크기 설정
 
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
+    try:
+        # ChromeDriver 설치 및 경로 설정
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
+    except Exception as e:
+        st.error(f"ChromeDriver 초기화 중 오류 발생: {e}")
+        return
 
     wb = Workbook()
     ws = wb.active
