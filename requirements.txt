@@ -3,3 +3,4 @@ selenium-wire
 chromedriver_autoinstaller
 beautifulsoup4
 pandas
+blinker
