@@ -1,9 +1,8 @@
 streamlit
-selenium
-webdriver-manager
-Pillow
-openpyxl
+pandas
 requests
 beautifulsoup4
-chromium
-
+openpyxl
+Pillow
+selenium
+webdriver-manager
