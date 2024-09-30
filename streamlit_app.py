@@ -1,5 +1,6 @@
 import os
 import urllib.request
+import re
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
@@ -28,11 +29,13 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
-    # webdriver_manager를 사용해 ChromeDriver 관리
+    # ChromeDriverManager를 사용하여 ChromeDriver 설치
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('--headless')  # Headless 모드
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')  # GPU 사용 비활성화
+    chrome_options.add_argument('--window-size=1920,1080')  # 가상 화면 크기 설정
 
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
 
