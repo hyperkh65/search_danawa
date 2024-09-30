@@ -1,119 +1,95 @@
-import streamlit as st
-import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-import time
+from PIL import Image
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as ExcelImage
+import requests
+import os
+import re
+from datetime import datetime
 
-# 페이지 컨텐츠를 받아오는 함수
-def get_page_content(search_query, page_num):
-    url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-    response = requests.get(url, headers=headers)
-    return BeautifulSoup(response.content, 'html.parser')
+def resize_image(image_path, width, height):
+    img = Image.open(image_path)
+    img = img.resize((width, height))
+    img.save(image_path)
 
-# 제품 정보 크롤링 함수
-def crawl_product_info(search_query):
-    product_list = []
-    
-    # 최대 페이지 수 자동으로 추출
-    soup = get_page_content(search_query, 1)
-    max_pages = len(soup.select('div.paging_number_wrap a'))  # 최대 페이지 수 추출
+def create_default_image(image_path):
+    default_image = Image.new('RGB', (100, 100), color='white')
+    default_image.save(image_path)
 
-    for page_num in range(1, max_pages + 1):
-        st.progress(page_num / max_pages)  # 진행률 표시
-        soup = get_page_content(search_query, page_num)
-        products = soup.select('li.prod_item')
+def clean_filename(filename):
+    return re.sub(r'[\/:*?"<>|]', '_', filename)
 
-        for product in products:
+def main(search_query, start_page, end_page):
+    wb = Workbook()
+    ws = wb.active
+    ws.append(['상품', '가격', '이미지', '부가정보', '링크', '등록월', '평점', '리뷰 수'])
+
+    image_directory = 'product_images'
+    if not os.path.exists(image_directory):
+        os.makedirs(image_directory)
+
+    default_image_path = os.path.join(image_directory, "default_image.png")
+    create_default_image(default_image_path)
+
+    for page_num in range(start_page, end_page + 1):
+        url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        product_containers = soup.select('div.prod_main_info')
+
+        for container in product_containers:
             try:
-                # 제품명 가져오기
-                name_tag = product.select_one('p.prod_name a')
-                name = name_tag.text.strip() if name_tag else '정보 없음'
-                
-                # 업체명 추출
-                업체명 = name.split(' ')[0]  # 첫 번째 공백 전까지 잘라서 업체명으로 사용
-                제품명 = ' '.join(name.split(' ')[1:])  # 첫 번째 공백 이후 제품명
+                product_title = container.select_one('div.prod_info > p > a').text.strip()
+                product_price = container.select_one('div.prod_pricelist > ul > li > p.price_sect > a > strong').text.strip()
+                registration_month = container.select_one('div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_date > dd').text.strip()
+                rating = container.select_one('div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_star > div.point_num > strong').text.strip()
+                review_count = container.select_one('div.prod_sub_info > div.prod_sub_meta > dl.meta_item.mt_comment > dd > div.cnt_opinion > a > strong').text.strip()
+            except:
+                product_price = "가격 정보 없음"
+                registration_month = "등록월 정보 없음"
+                rating = "평점 정보 없음"
+                review_count = "리뷰 수 정보 없음"
 
-                # 가격 가져오기
-                price_tag = product.select_one('p.price_sect a strong')
-                price = price_tag.text.strip() if price_tag else '정보 없음'
+            product_image_tag = container.select_one('div.thumb_image > a > img')
+            lazyloaded_url = product_image_tag['data-src'] if product_image_tag and 'data-src' in product_image_tag.attrs else None
 
-                # 이미지 URL 가져오기
-                image_tag = product.select_one('div.thumb_image a img')
-                image_url = image_tag['src'] if image_tag else '정보 없음'
+            if lazyloaded_url:
+                if lazyloaded_url.startswith('//'):
+                    lazyloaded_url = 'https:' + lazyloaded_url
 
-                # 이미지 URL이 "//"로 시작하면 "https:"를 붙여서 절대 경로로 만듦
-                if image_url.startswith("//"):
-                    image_url = "https:" + image_url
+                image_filename = clean_filename(product_title) + ".png"
+                image_path = os.path.join(image_directory, image_filename)
 
-                # 링크 가져오기
-                link_tag = product.select_one('div.thumb_image a')
-                link = link_tag['href'] if link_tag else '정보 없음'
+                # 이미지 다운로드
+                try:
+                    img_data = requests.get(lazyloaded_url).content
+                    with open(image_path, 'wb') as handler:
+                        handler.write(img_data)
+                    resize_image(image_path, width=100, height=100)
+                    img = ExcelImage(image_path)
+                except Exception as e:
+                    print(f"이미지 다운로드 실패: {e}")
+                    img = ExcelImage(default_image_path)
+            else:
+                img = ExcelImage(default_image_path)
 
-                # 추가 정보, 등록월, 평점, 리뷰 수 가져오기
-                additional_info_tag = product.select_one('div.spec_list')
-                additional_info = additional_info_tag.text.strip() if additional_info_tag else '정보 없음'
+            try:
+                additional_info = container.select_one('div.spec_list').text.strip()
+            except:
+                additional_info = "부가정보 없음"
 
-                registration_date_tag = product.select_one('div.prod_sub_meta > dl.meta_item.mt_date > dd')
-                registration_date = registration_date_tag.text.strip() if registration_date_tag else '정보 없음'
+            product_link = container.select_one('a.thumb_link')['href']
 
-                rating_tag = product.select_one('div.star-single > span.text__score')
-                rating = rating_tag.text.strip() if rating_tag else '정보 없음'
+            ws.append([product_title, product_price, '', additional_info, product_link, registration_month, rating, review_count])
+            ws.add_image(img, f'C{ws.max_row}')
 
-                review_count_tag = product.select_one('div.text__review > span.text__number')
-                review_count = review_count_tag.text.strip() if review_count_tag else '정보 없음'
+    today_date = datetime.today().strftime('%Y-%m-%d')
+    filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
+    wb.save(filename)
 
-                # 데이터 저장
-                product_list.append({
-                    '업체명': 업체명,
-                    '제품명': 제품명,
-                    '추가정보': additional_info,
-                    '가격': price,
-                    '이미지': image_url,
-                    '링크': link,
-                    '평점': rating,
-                    '리뷰 수': review_count,
-                    '등록월': registration_date
-                })
-
-            except Exception as e:
-                print(f"Error processing product: {e}")
-
-    return product_list
-
-# Streamlit 애플리케이션 설정
-st.set_page_config(layout="wide")
-
-# 왼쪽 옵션 패널 만들기
-with st.sidebar:
-    st.title("검색 옵션")
-    search_query = st.text_input("검색어 입력", "노트북")
-    search_button = st.button("검색")
-
-# 검색 버튼이 눌렸을 때
-if search_button:
-    st.write(f"'{search_query}' 검색 결과:")
-    
-    # 크롤링 시작
-    product_list = crawl_product_info(search_query)
-    
-    # 결과를 데이터프레임으로 변환 후 출력
-    df = pd.DataFrame(product_list)
-    st.dataframe(df)
-
-    # 각 제품의 이미지를 크게 표시
-    st.subheader("제품 이미지")
-    for product in product_list:
-        if product['이미지'] != '정보 없음':  # 이미지가 존재하는 경우에만 표시
-            st.image(product['이미지'], caption=product['제품명'], use_column_width='auto')  # 이미지 크기 자동 조정
-
-    # CSV 파일 다운로드 버튼
-    csv = df.to_csv(index=False, encoding='utf-8-sig')
-    st.download_button(
-        label="CSV 다운로드",
-        data=csv,
-        file_name=f'{search_query}_검색결과.csv',
-        mime='text/csv'
-    )
+if __name__ == '__main__':
+    search_query = input("검색어를 입력하세요: ")
+    start_page = int(input("시작 페이지를 입력하세요: "))
+    end_page = int(input("종료 페이지를 입력하세요: "))
+    main(search_query, start_page, end_page)
