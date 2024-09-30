@@ -54,10 +54,11 @@ def crawl_product_info(search_query):
                 st.error(f"제품 정보를 처리하는 중 오류가 발생했습니다: {e}")
                 continue
 
-        # 페이징 처리 - 다음 페이지 확인
-        next_page = soup.select_one('a.snum.click_log_page', {'data-page': current_page + 1})
+        # 다음 페이지 존재 여부 확인 (data-page 값을 사용하지 않음)
+        next_page = soup.select_one('a.snum.next')
         if next_page:
             current_page += 1
+            params['page'] = current_page  # 다음 페이지 요청
         else:
             break
 
