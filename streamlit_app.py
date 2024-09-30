@@ -1,63 +1,44 @@
 import streamlit as st
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import time
 from datetime import datetime
-import urllib.request
 import re
-import io
 import base64
 
-def get_driver():
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=options)
-
-def go_to_page(driver, search_query, page_num):
+def get_page_content(search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
-    driver.get(url)
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, 'div.prod_main_info'))
-    )
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    return BeautifulSoup(response.content, 'html.parser')
 
-def clean_filename(filename):
-    return re.sub(r'[\/:*?"<>|]', '_', filename)
+def clean_text(text):
+    return re.sub(r'\s+', ' ', text).strip()
 
 def main(search_query, start_page, end_page):
-    driver = get_driver()
     data = []
 
     for page_num in range(start_page, end_page + 1):
-        go_to_page(driver, search_query, page_num)
-        product_containers = driver.find_elements(By.CSS_SELECTOR, 'div.prod_main_info')
+        soup = get_page_content(search_query, page_num)
+        product_containers = soup.select('div.prod_main_info')
 
         for container in product_containers:
             try:
-                product_name = container.find_element(By.CSS_SELECTOR, 'p.prod_name').text
-                price = container.find_element(By.CSS_SELECTOR, 'p.price').text
-                link = container.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
-                image_url = container.find_element(By.CSS_SELECTOR, 'img').get_attribute('src')
-                additional_info = container.find_element(By.CSS_SELECTOR, 'p.info').text
+                product_name = clean_text(container.select_one('p.prod_name').text)
+                price = clean_text(container.select_one('p.price_sect').text)
+                link = container.select_one('a')['href']
+                image_url = container.select_one('img')['src']
+                additional_info = clean_text(container.select_one('p.spec_list').text)
                 registration_date = datetime.today().strftime('%Y-%m-%d')
-                rating = container.find_element(By.CSS_SELECTOR, 'span.rating').text if container.find_elements(By.CSS_SELECTOR, 'span.rating') else "N/A"
-                review_count = container.find_element(By.CSS_SELECTOR, 'span.review_count').text if container.find_elements(By.CSS_SELECTOR, 'span.review_count') else "0"
+                rating = clean_text(container.select_one('span.rating').text) if container.select_one('span.rating') else "N/A"
+                review_count = clean_text(container.select_one('span.cm_count').text) if container.select_one('span.cm_count') else "0"
 
                 data.append([product_name, price, image_url, additional_info, link, registration_date, rating, review_count])
 
             except Exception as e:
                 st.write(f"Error processing product: {e}")
-
-    driver.quit()
 
     df = pd.DataFrame(data, columns=['상품', '가격', '이미지 URL', '부가정보', '링크', '등록월', '평점', '리뷰 수'])
     return df
