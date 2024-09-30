@@ -5,17 +5,18 @@ import re
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.common.by import By
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
-from bs4 import BeautifulSoup  # 이 줄에서 모듈이 필요합니다.
+from bs4 import BeautifulSoup
 
 def download_chromedriver():
     url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
     response = requests.get(url)
-    
+
     with open("chromedriver.zip", "wb") as file:
         file.write(response.content)
 
@@ -47,6 +48,8 @@ def main(search_query, start_page, end_page):
     chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument("user-agent=Your User Agent")  # 사용자 에이전트 설정
 
     # 드라이버 초기화
     driver = webdriver.Chrome(service=ChromeService("chromedriver"), options=chrome_options)
@@ -120,10 +123,6 @@ def main(search_query, start_page, end_page):
     filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
 
     wb.save(filename)
-    
-    # Google Colab에서 다운로드 링크를 생성하여 파일 다운로드 (필요 시 주석 해제)
-    # from google.colab import files
-    # files.download(filename)  
 
 if __name__ == '__main__':
     search_query = input("검색어를 입력하세요: ")
