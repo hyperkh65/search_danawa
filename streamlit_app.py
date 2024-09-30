@@ -13,13 +13,14 @@ from bs4 import BeautifulSoup
 from openpyxl import Workbook
 import streamlit as st
 from webdriver_manager.chrome import ChromeDriverManager
+from PIL import Image
 
 def get_website_content(url):
     driver = None
     try:
-        # Local ChromeDriver setup
+        # ChromeDriver 설정
         options = Options()
-        options.add_argument('--headless')
+        options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1200')
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -48,7 +49,7 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
-    chrome_options = webdriver.ChromeOptions()
+    chrome_options = Options()
     chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
