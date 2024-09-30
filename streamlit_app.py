@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import time
 
 # 페이지 컨텐츠를 받아오는 함수
 def get_page_content(search_query, page_num):
@@ -27,6 +26,10 @@ def crawl_product_info(search_query):
     soup = get_page_content(search_query, 1)
     max_pages = get_total_pages(soup)
     
+    if max_pages == 0:
+        st.warning("페이지를 찾을 수 없습니다.")
+        return product_list
+
     with st.progress(0) as progress_bar:
         for page_num in range(1, max_pages + 1):
             soup = get_page_content(search_query, page_num)
@@ -82,7 +85,7 @@ def crawl_product_info(search_query):
                     print(f"Error processing product: {e}")
 
             # 진행률 업데이트
-            progress_bar.progress(page_num / max_pages)
+            progress_bar.progress((page_num / max_pages) if max_pages > 0 else 0)
 
     return product_list
 
@@ -103,14 +106,17 @@ if search_button:
     product_list = crawl_product_info(search_query)
     
     # 결과를 데이터프레임으로 변환 후 출력
-    df = pd.DataFrame(product_list)
-    st.dataframe(df)
+    if product_list:
+        df = pd.DataFrame(product_list)
+        st.dataframe(df)
 
-    # CSV 파일 다운로드 버튼
-    csv = df.to_csv(index=False, encoding='utf-8-sig')
-    st.download_button(
-        label="CSV 다운로드",
-        data=csv,
-        file_name=f'{search_query}_검색결과.csv',
-        mime='text/csv'
-    )
+        # CSV 파일 다운로드 버튼
+        csv = df.to_csv(index=False, encoding='utf-8-sig')
+        st.download_button(
+            label="CSV 다운로드",
+            data=csv,
+            file_name=f'{search_query}_검색결과.csv',
+            mime='text/csv'
+        )
+    else:
+        st.warning("검색 결과가 없습니다.")
