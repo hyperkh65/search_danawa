@@ -9,9 +9,9 @@ from selenium.webdriver.common.by import By
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
-from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
 from bs4 import BeautifulSoup
+import streamlit as st
 
 def download_chromedriver():
     url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
@@ -40,18 +40,16 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
-    # ChromeDriver가 존재하지 않으면 다운로드
     if not os.path.exists("chromedriver"):
         download_chromedriver()
 
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
+    chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.add_argument("user-agent=Your User Agent")  # 사용자 에이전트 설정
+    chrome_options.add_argument("user-agent=Your User Agent")
 
-    # 드라이버 초기화
     driver = webdriver.Chrome(service=ChromeService("chromedriver"), options=chrome_options)
 
     wb = Workbook()
@@ -123,9 +121,17 @@ def main(search_query, start_page, end_page):
     filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
 
     wb.save(filename)
+    
+    st.success(f"크롤링 완료! 결과 파일: {filename}")
 
-if __name__ == '__main__':
-    search_query = input("검색어를 입력하세요: ")
-    start_page = int(input("시작 페이지를 입력하세요: "))
-    end_page = int(input("종료 페이지를 입력하세요: "))
-    main(search_query, start_page, end_page)
+# Streamlit UI 설정
+st.title("제품 크롤러")
+search_query = st.text_input("검색어를 입력하세요:")
+start_page = st.number_input("시작 페이지:", min_value=1, value=1)
+end_page = st.number_input("종료 페이지:", min_value=1, value=1)
+
+if st.button("크롤링 시작"):
+    if search_query:
+        main(search_query, start_page, end_page)
+    else:
+        st.warning("검색어를 입력해 주세요.")
