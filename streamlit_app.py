@@ -2,83 +2,102 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import time
 
-# 제품 정보를 저장할 리스트
-products = []
+# 페이지 컨텐츠를 받아오는 함수
+def get_page_content(search_query, page_num):
+    url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    return BeautifulSoup(response.content, 'html.parser')
 
-# 진행률 표시 함수
-def update_progress_bar(total, completed):
-    percent = (completed / total) * 100
-    progress_text = f"{completed}/{total} ({percent:.2f}%)"
-    st.session_state.progress_bar.progress(percent)
-    st.session_state.progress_text.text(progress_text)
-
-# 제품 정보 추출 함수
-def extract_product_info(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
+# 제품 정보 크롤링 함수
+def crawl_product_info(search_query, max_pages):
+    product_list = []
     
-    product_list = soup.select('div.prod_info')
-    for product in product_list:
-        try:
-            name = product.select_one('p.prod_name > a').text.strip()
-            price = product.select_one('div.prod_pricelist > ul > li > p.price_sect > a > strong').text.strip()
-            image_url = product.select_one('div.thumb_image > a > img')['src']
-            link = product.select_one('div.thumb_image > a')['href']
-            additional_info = product.select_one('div.spec_list').text.strip()
-            registration_month = product.select_one('div.prod_sub_meta > dl.meta_item.mt_date > dd').text.strip()
-            rating = product.select_one('div.star-single > span.text__score').text.strip()
-            review_count = product.select_one('div.text__review > span.text__number').text.strip()
+    for page_num in range(1, max_pages + 1):
+        st.progress(page_num / max_pages)  # 진행률 표시
+        soup = get_page_content(search_query, page_num)
+        products = soup.select('li.prod_item')
 
-            products.append({
-                "Product Name": name,
-                "Price": price,
-                "Image URL": image_url,
-                "Link": link,
-                "Additional Info": additional_info,
-                "Registration Month": registration_month,
-                "Rating": rating,
-                "Review Count": review_count,
-            })
-        except Exception as e:
-            st.error(f"Error processing product: {e}")
+        for product in products:
+            try:
+                # 제품명 가져오기
+                name_tag = product.select_one('div.prod_info > p.prod_name > a')
+                name = name_tag.text.strip() if name_tag else '정보 없음'
 
-# 페이지 크롤링 함수
-def crawl_pages(base_url, total_pages):
-    for page in range(1, total_pages + 1):
-        url = f"{base_url}?page={page}"
-        extract_product_info(url)
-        update_progress_bar(total_pages, page)
-        time.sleep(1)  # 요청 간의 지연
+                # 가격 가져오기
+                price_tag = product.select_one('div.prod_pricelist > ul > li > p.price_sect > a > strong')
+                price = price_tag.text.strip() if price_tag else '정보 없음'
 
-# Streamlit 앱 구성
-st.set_page_config(page_title="Product Scraper", layout="wide")
+                # 이미지 URL 가져오기
+                img_tag = product.select_one('div.thumb_image > a > img')
+                img_url = img_tag['src'] if img_tag else '정보 없음'
 
-# 왼쪽 옵션 패널
-st.sidebar.header("Search Options")
-search_query = st.sidebar.text_input("Search Query")
-search_button = st.sidebar.button("Search")
+                # 제품 링크 가져오기
+                link_tag = product.select_one('div.thumb_image > a')
+                link = link_tag['href'] if link_tag else '정보 없음'
 
-# 진행률 표시
-if "progress_bar" not in st.session_state:
-    st.session_state.progress_bar = st.empty()
-if "progress_text" not in st.session_state:
-    st.session_state.progress_text = st.empty()
+                # 추가 정보 가져오기
+                spec_tag = product.select_one('div.spec_list')
+                spec = spec_tag.text.strip() if spec_tag else '정보 없음'
 
-# 결과 표시
+                # 등록월 가져오기
+                date_tag = product.select_one('div.prod_sub_meta > dl.meta_item.mt_date > dd')
+                date = date_tag.text.strip() if date_tag else '정보 없음'
+
+                # 평점 가져오기
+                rating_tag = product.select_one('div.star-single > span.text__score')
+                rating = rating_tag.text.strip() if rating_tag else '정보 없음'
+
+                # 리뷰 수 가져오기
+                review_tag = product.select_one('div.text__review > span.text__number')
+                review_count = review_tag.text.strip() if review_tag else '정보 없음'
+
+                # 데이터 저장
+                product_list.append({
+                    '제품명': name,
+                    '가격': price,
+                    '이미지 URL': img_url,
+                    '링크': link,
+                    '추가 정보': spec,
+                    '등록월': date,
+                    '평점': rating,
+                    '리뷰 수': review_count
+                })
+
+            except Exception as e:
+                print(f"Error processing product: {e}")
+
+    return product_list
+
+# Streamlit 애플리케이션 설정
+st.set_page_config(layout="wide")
+
+# 왼쪽 옵션 패널 만들기
+with st.sidebar:
+    st.title("검색 옵션")
+    search_query = st.text_input("검색어 입력", "노트북")
+    max_pages = st.number_input("최대 페이지 수", min_value=1, max_value=100, value=5)
+    search_button = st.button("검색")
+
+# 검색 버튼이 눌렸을 때
 if search_button:
-    base_url = "http://example.com/products"  # 실제 URL로 변경
-    total_pages = 10  # 페이지 수 설정
-    crawl_pages(base_url, total_pages)
+    st.write(f"'{search_query}' 검색 결과:")
     
-    # DataFrame으로 변환
-    df = pd.DataFrame(products)
+    # 크롤링 시작
+    product_list = crawl_product_info(search_query, max_pages)
     
-    # CSV 다운로드
-    csv_file = df.to_csv(index=False, encoding='utf-8-sig')
-    st.download_button("Download CSV", csv_file, "products.csv", "text/csv")
+    # 결과를 데이터프레임으로 변환 후 출력
+    df = pd.DataFrame(product_list)
+    st.dataframe(df)
 
-    # 결과 표시
-    st.write(df)
-
+    # CSV 파일 다운로드 버튼
+    csv = df.to_csv(index=False, encoding='utf-8-sig')
+    st.download_button(
+        label="CSV 다운로드",
+        data=csv,
+        file_name=f'{search_query}_검색결과.csv',
+        mime='text/csv'
+    )
