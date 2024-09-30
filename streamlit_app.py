@@ -2,13 +2,39 @@ import os
 import requests
 import urllib.request
 import re
+import time
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
-from PIL import Image
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup
 from openpyxl import Workbook
 import streamlit as st
+from webdriver_manager.chrome import ChromeDriverManager
+
+def get_website_content(url):
+    driver = None
+    try:
+        # Local ChromeDriver setup
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1200')
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        st.write(f"DEBUG:DRIVER:{driver}")
+        driver.get(url)
+        time.sleep(5)
+        html_doc = driver.page_source
+        soup = BeautifulSoup(html_doc, "html.parser")
+        return soup.get_text()
+    except Exception as e:
+        st.write(f"DEBUG:INIT_DRIVER:ERROR:{e}")
+    finally:
+        if driver is not None:
+            driver.quit()
+    return None
 
 def go_to_page(driver, search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
@@ -27,9 +53,7 @@ def main(search_query, start_page, end_page):
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
 
-    # 기본 ChromeDriver 사용
-    service = ChromeService()  # 여기서 executable_path 생략
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     wb = Workbook()
     ws = wb.active
@@ -69,7 +93,7 @@ def main(search_query, start_page, end_page):
                 ws.append([product_name, price, image_path, additional_info, link, registration_date, rating, review_count])
 
             except Exception as e:
-                print(f"Error processing product: {e}")
+                st.write(f"Error processing product: {e}")
 
     today_date = datetime.today().strftime('%Y-%m-%d')
     filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
