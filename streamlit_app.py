@@ -13,6 +13,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
 import streamlit as st
 
+# ChromeDriver 다운로드 함수
 def download_chromedriver():
     url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
     response = requests.get(url)
@@ -23,17 +24,21 @@ def download_chromedriver():
     os.system("unzip chromedriver.zip")
     os.system("chmod +x chromedriver")  # 실행 권한 부여
 
+# 페이지로 이동하는 함수
 def go_to_page(driver, search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
     driver.get(url)
 
+# 기본 이미지 생성 함수
 def create_default_image(image_path):
     default_image = Image.new('RGB', (100, 100), color='white')
     default_image.save(image_path)
 
+# 파일 이름 정리 함수
 def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
+# 메인 함수
 def main(search_query, start_page, end_page):
     # ChromeDriver가 존재하지 않으면 다운로드
     if not os.path.exists("chromedriver"):
@@ -65,12 +70,36 @@ def main(search_query, start_page, end_page):
         product_containers = driver.find_elements(By.CSS_SELECTOR, 'div.prod_main_info')
 
         for container in product_containers:
-            # (중략: 크롤링 로직은 기존과 동일)
+            try:
+                product_name = container.find_element(By.CSS_SELECTOR, 'p.prod_name').text
+                price = container.find_element(By.CSS_SELECTOR, 'p.price').text
+                link = container.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
+
+                # 이미지 URL 수집
+                image_url = container.find_element(By.CSS_SELECTOR, 'img').get_attribute('src')
+                if not image_url:
+                    image_path = default_image_path
+                else:
+                    image_name = clean_filename(product_name) + ".png"
+                    image_path = os.path.join(image_directory, image_name)
+                    urllib.request.urlretrieve(image_url, image_path)
+
+                # 부가 정보 및 리뷰 수
+                additional_info = container.find_element(By.CSS_SELECTOR, 'p.info').text
+                registration_date = datetime.today().strftime('%Y-%m-%d')  # 현재 날짜로 설정
+                rating = container.find_element(By.CSS_SELECTOR, 'span.rating').text if container.find_elements(By.CSS_SELECTOR, 'span.rating') else "N/A"
+                review_count = container.find_element(By.CSS_SELECTOR, 'span.review_count').text if container.find_elements(By.CSS_SELECTOR, 'span.review_count') else "0"
+
+                ws.append([product_name, price, image_path, additional_info, link, registration_date, rating, review_count])
+
+            except Exception as e:
+                print(f"Error processing product: {e}")
 
     today_date = datetime.today().strftime('%Y-%m-%d')
     filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
-
     wb.save(filename)
+
+    driver.quit()  # 드라이버 종료
 
 if __name__ == '__main__':
     st.title("Streamlit과 Selenium 웹 크롤링")
