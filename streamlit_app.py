@@ -1,16 +1,26 @@
 import os
+import requests
 import urllib.request
 import re
+from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
+from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment
-from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
-import streamlit as st
+from bs4 import BeautifulSoup
+
+def download_chromedriver():
+    url = "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
+    response = requests.get(url)
+    
+    with open("chromedriver.zip", "wb") as file:
+        file.write(response.content)
+
+    os.system("unzip chromedriver.zip")
+    os.system("chmod +x chromedriver")  # 실행 권한 부여
 
 def go_to_page(driver, search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&originalQuery={search_query}&previousKeyword={search_query}&checkedInfo=N&volumeType=allvs&page={page_num}&limit=40&sort=saveDESC&list=list&boost=true&tab=goods&addDelivery=N&coupangMemberSort=N&isInitTireSmartFinder=N&recommendedSort=N&defaultUICategoryCode=15242844&defaultPhysicsCategoryCode=1826%7C58563%7C58565%7C0&defaultVmTab=331&defaultVaTab=45807&isZeroPrice=Y&quickProductYN=N&priceUnitSort=N&priceUnitSortOrder=A"
@@ -29,20 +39,17 @@ def clean_filename(filename):
     return re.sub(r'[\/:*?"<>|]', '_', filename)
 
 def main(search_query, start_page, end_page):
-    # ChromeDriverManager를 사용하여 ChromeDriver 설치
+    # ChromeDriver가 존재하지 않으면 다운로드
+    if not os.path.exists("chromedriver"):
+        download_chromedriver()
+
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')  # Headless 모드
+    chrome_options.add_argument('--headless')  # 브라우저를 보이지 않게 설정
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')  # GPU 사용 비활성화
-    chrome_options.add_argument('--window-size=1920,1080')  # 가상 화면 크기 설정
 
-    # ChromeDriver 설치 및 경로 설정
-    try:
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
-    except Exception as e:
-        st.error(f"ChromeDriver 초기화 중 오류 발생: {e}")
-        return
+    # 드라이버 초기화
+    driver = webdriver.Chrome(service=ChromeService("chromedriver"), options=chrome_options)
 
     wb = Workbook()
     ws = wb.active
@@ -113,20 +120,13 @@ def main(search_query, start_page, end_page):
     filename = f"온라인_시장조사_{search_query}_{today_date}.xlsx"
 
     wb.save(filename)
-    st.success(f"{filename} 파일이 생성되었습니다.")
-
-    # Streamlit에서 다운로드 버튼을 추가
-    with open(filename, "rb") as f:
-        st.download_button("다운로드", f, filename=filename)
+    
+    # Google Colab에서 다운로드 링크를 생성하여 파일 다운로드 (필요 시 주석 해제)
+    # from google.colab import files
+    # files.download(filename)  
 
 if __name__ == '__main__':
-    st.title("온라인 시장 조사")
-    search_query = st.text_input("검색어를 입력하세요:")
-    start_page = st.number_input("시작 페이지를 입력하세요:", min_value=1, value=1)
-    end_page = st.number_input("종료 페이지를 입력하세요:", min_value=1, value=1)
-
-    if st.button("검색"):
-        if search_query:
-            main(search_query, start_page, end_page)
-        else:
-            st.warning("검색어를 입력해주세요.")
+    search_query = input("검색어를 입력하세요: ")
+    start_page = int(input("시작 페이지를 입력하세요: "))
+    end_page = int(input("종료 페이지를 입력하세요: "))
+    main(search_query, start_page, end_page)
