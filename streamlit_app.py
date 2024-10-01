@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import re
-import time
 
 # 페이지 컨텐츠를 받아오는 함수
 def get_page_content(search_query, page_num):
@@ -17,9 +15,16 @@ def get_page_content(search_query, page_num):
 # 제품 정보 크롤링 함수
 def crawl_product_info(search_query):
     product_list = []
+    
     # 페이지 수 자동 계산
     soup = get_page_content(search_query, 1)
-    max_pages = int(soup.select_one('div.paging_number_wrap').find_all('a')[-1]['data-page'])
+    paging_div = soup.select_one('div.paging_number_wrap')
+
+    if paging_div:
+        max_pages = int(paging_div.find_all('a')[-1]['data-page'])
+    else:
+        st.error("페이지 정보를 가져올 수 없습니다. 검색어를 확인해 주세요.")
+        return []  # 빈 리스트 반환하여 이후 코드를 중단
 
     # 각 페이지에서 제품 정보 크롤링
     for page_num in range(1, max_pages + 1):
@@ -95,20 +100,26 @@ with st.sidebar:
 
 # 검색 버튼이 눌렸을 때
 if search_button:
-    st.write(f"'{search_query}' 검색 결과:")
-    
-    # 크롤링 시작
-    product_list = crawl_product_info(search_query)
-    
-    # 결과를 데이터프레임으로 변환 후 출력
-    df = pd.DataFrame(product_list)
-    st.dataframe(df)
+    if not search_query.strip():
+        st.error("검색어를 입력해 주세요.")
+    else:
+        st.write(f"'{search_query}' 검색 결과:")
+        
+        # 크롤링 시작
+        product_list = crawl_product_info(search_query)
+        
+        if not product_list:
+            st.warning("제품이 없습니다. 다른 검색어로 시도해 주세요.")
+        else:
+            # 결과를 데이터프레임으로 변환 후 출력
+            df = pd.DataFrame(product_list)
+            st.dataframe(df)
 
-    # CSV 파일 다운로드 버튼
-    csv = df.to_csv(index=False, encoding='utf-8-sig')
-    st.download_button(
-        label="CSV 다운로드",
-        data=csv,
-        file_name=f'{search_query}_검색결과.csv',
-        mime='text/csv'
-    )
+            # CSV 파일 다운로드 버튼
+            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="CSV 다운로드",
+                data=csv,
+                file_name=f'{search_query}_검색결과.csv',
+                mime='text/csv'
+            )
