@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as ExcelImage
+import io
 
 # 페이지 컨텐츠를 받아오는 함수
 def get_page_content(search_query, page_num):
@@ -86,6 +89,40 @@ def crawl_product_info(search_query):
 
     return product_list
 
+# 엑셀 파일 생성 함수
+def create_excel_with_images(product_list):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "제품 목록"
+    
+    # 헤더 추가
+    headers = ['업체명', '제품명', '추가정보', '가격', '이미지', '링크', '평점', '리뷰수', '등록월']
+    ws.append(headers)
+
+    for product in product_list:
+        # 제품 정보 추가
+        row = [
+            product['업체명'],
+            product['제품명'],
+            product['추가정보'],
+            product['가격'],
+            product['링크'],
+            product['평점'],
+            product['리뷰수'],
+            product['등록월']
+        ]
+        ws.append(row)
+        
+        # 이미지 추가
+        if product['이미지'] != '정보 없음':
+            image_response = requests.get(product['이미지'])
+            img = ExcelImage(io.BytesIO(image_response.content))
+            img.width = 100  # 이미지 너비 조정 (원하는 대로 설정 가능)
+            img.height = 100  # 이미지 높이 조정 (원하는 대로 설정 가능)
+            ws.add_image(img, f'E{ws.max_row}')  # E열에 이미지 삽입
+
+    return wb
+
 # Streamlit 애플리케이션 설정
 st.set_page_config(layout="wide")
 
@@ -115,11 +152,16 @@ if search_button:
             df = pd.DataFrame(product_list)
             st.dataframe(df)
 
-            # CSV 파일 다운로드 버튼
-            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            # 엑셀 파일 생성
+            wb = create_excel_with_images(product_list)
+            excel_buffer = io.BytesIO()
+            wb.save(excel_buffer)
+            excel_buffer.seek(0)
+
+            # 엑셀 파일 다운로드 버튼
             st.download_button(
-                label="CSV 다운로드",
-                data=csv,
-                file_name=f'{search_query}_검색결과.csv',
-                mime='text/csv'
+                label="엑셀 다운로드",
+                data=excel_buffer,
+                file_name=f'{search_query}_검색결과.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
