@@ -2,11 +2,8 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-from openpyxl import Workbook
-from openpyxl.drawing.image import Image as ExcelImage
-from PIL import Image
-import io
-import os
+import re
+import time
 
 # 페이지 컨텐츠를 받아오는 함수
 def get_page_content(search_query, page_num):
@@ -84,40 +81,6 @@ def crawl_product_info(search_query):
 
     return product_list
 
-# 엑셀 파일 생성 함수
-def create_excel_with_images(product_list, search_query):
-    wb = Workbook()
-    ws = wb.active
-    ws.append(['업체명', '제품명', '추가정보', '가격', '이미지', '링크', '평점', '리뷰수', '등록월'])
-
-    for product in product_list:
-        ws.append([
-            product['업체명'],
-            product['제품명'],
-            product['추가정보'],
-            product['가격'],
-            '',  # 이미지는 나중에 추가
-            product['링크'],
-            product['평점'],
-            product['리뷰수'],
-            product['등록월']
-        ])
-        
-        # 이미지 다운로드 및 엑셀에 추가
-        이미지_URL = product['이미지']
-        if 이미지_URL != '정보 없음':
-            try:
-                img_response = requests.get(이미지_URL)
-                image = Image.open(io.BytesIO(img_response.content))
-                image_path = f"{search_query}_img_{len(product_list)}.png"
-                image.save(image_path)
-                img = ExcelImage(image_path)
-                ws.add_image(img, f'E{ws.max_row}')
-            except Exception as e:
-                print(f"이미지 다운로드 실패: {e}")
-
-    return wb
-
 # Streamlit 애플리케이션 설정
 st.set_page_config(layout="wide")
 
@@ -141,16 +104,11 @@ if search_button:
     df = pd.DataFrame(product_list)
     st.dataframe(df)
 
-    # 엑셀 파일 생성
-    wb = create_excel_with_images(product_list, search_query)
-    excel_file = f"{search_query}_검색결과.xlsx"
-    wb.save(excel_file)
-
-    # 엑셀 파일 다운로드 버튼
-    with open(excel_file, "rb") as f:
-        st.download_button(
-            label="엑셀 다운로드",
-            data=f,
-            file_name=excel_file,
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+    # CSV 파일 다운로드 버튼
+    csv = df.to_csv(index=False, encoding='utf-8-sig')
+    st.download_button(
+        label="CSV 다운로드",
+        data=csv,
+        file_name=f'{search_query}_검색결과.csv',
+        mime='text/csv'
+    )
