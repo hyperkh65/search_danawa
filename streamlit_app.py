@@ -6,6 +6,8 @@ from openpyxl.drawing.image import Image as ExcelImage
 from PIL import Image
 import io
 import os
+import re
+from datetime import datetime
 
 def go_to_page(search_query, page_num):
     url = f"https://search.danawa.com/dsearch.php?query={search_query}&page={page_num}"
@@ -48,7 +50,7 @@ def create_excel_with_images(products):
         price = product['price']
         image_url = product['image_url']
 
-        # 이미지 다운로드
+        # 이미지 다운로드 및 엑셀에 추가
         if image_url:
             try:
                 image_response = requests.get(image_url)
